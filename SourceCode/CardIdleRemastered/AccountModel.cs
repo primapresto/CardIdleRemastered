@@ -4,6 +4,7 @@ using System.Collections.ObjectModel;
 using System.Collections.Specialized;
 using System.ComponentModel;
 using System.ComponentModel.Design.Serialization;
+using System.Diagnostics;
 using System.Globalization;
 using System.Linq;
 using System.Reflection;
@@ -142,7 +143,7 @@ namespace CardIdleRemastered
             {
                 try
                 {
-                    return Steamworks.SteamAPI.IsSteamRunning() || IgnoreClient;
+                    return IgnoreClient || Process.GetProcessesByName("steam").Length > 0;
                 }
                 catch
                 {
@@ -431,7 +432,10 @@ namespace CardIdleRemastered
             {
                 bool connected = IsSteamRunning;
                 if (steamRunning != connected)
+                {
                     OnPropertyChanged(nameof(IsSteamRunning));
+                    CommandManager.InvalidateRequerySuggested();
+                }
                 steamRunning = connected;
             };
             _tmSteamStatus.Start();
