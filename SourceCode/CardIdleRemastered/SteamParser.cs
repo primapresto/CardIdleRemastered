@@ -55,9 +55,12 @@ namespace CardIdleRemastered
                 catch (Exception ex)
                 {
                     _appsCache = new Dictionary<string, GameIdentity>();
-                    Logger.Exception(ex, "GetSteamApps");
                     if (!String.IsNullOrWhiteSpace(response))
                         File.WriteAllText("AppList.json", response, Encoding.UTF8);
+                    else if (ex is WebException webException && webException.Response is HttpWebResponse httpResponse && httpResponse.StatusCode == HttpStatusCode.NotFound)
+                        Logger.Info("Steam app list endpoint is unavailable; continuing without the optional app catalog");
+                    else
+                        Logger.Exception(ex, "GetSteamApps");
                 }
             }
             return _appsCache;
@@ -83,23 +86,27 @@ namespace CardIdleRemastered
             string bg = null;
             if (html != null)
             {
-                var bgi = html.Attributes["style"].Value;
+                var bgi = html.GetAttributeValue("style", string.Empty);
                 if (!string.IsNullOrEmpty(bgi))
                 {
                     int lp = bgi.IndexOf('(') + 1;
                     int rp = bgi.IndexOf(')');
-                    string src = bgi.Substring(lp, rp - lp);
-                    bg = src.Trim(' ', '\'');
+                    if (lp > 0 && rp > lp)
+                    {
+                        string src = bgi.Substring(lp, rp - lp);
+                        bg = src.Trim(' ', '\'');
+                    }
                 }
             }
             result.BackgroundUrl = bg;
 
             // avatar
-            html = root.SelectNodes("//div[@class='playerAvatarAutoSizeInner']").FirstOrDefault();
+            html = root.SelectSingleNode("//div[@class='playerAvatarAutoSizeInner']");
             if (html != null)
             {
-                string src = html.ChildNodes["img"].Attributes["src"].Value;
-                result.AvatarUrl = src;
+                var image = html.SelectSingleNode(".//img[@src]");
+                if (image != null)
+                    result.AvatarUrl = image.GetAttributeValue("src", null);
             }
 
             // user name
@@ -111,21 +118,19 @@ namespace CardIdleRemastered
 
             // user level
             // same css class for user level and friends level
-            var levels = root.SelectNodes("//span[@class='friendPlayerLevelNum']").ToList();
-            if (levels.Count > 0)
-            {
-                result.Level = levels[0].InnerText;
-            }
+            var level = root.SelectSingleNode("//span[@class='friendPlayerLevelNum']");
+            if (level != null)
+                result.Level = level.InnerText.Trim();
 
             // favorite badge
             var badge = root.SelectSingleNode("//div[@class='profile_header_badge']");
             if (badge != null)
             {
-                var badgeImage = badge.SelectSingleNode("//img[contains(@class, 'badge_icon')]");
+                var badgeImage = badge.SelectSingleNode(".//img[contains(@class, 'badge_icon')]");
                 if (badgeImage != null)
-                    result.BadgeUrl = badgeImage.Attributes["src"].Value;
+                    result.BadgeUrl = badgeImage.GetAttributeValue("src", null);
 
-                var badgeTitle = badge.SelectSingleNode("//div[@class='favorite_badge_description']//a");
+                var badgeTitle = badge.SelectSingleNode(".//div[@class='favorite_badge_description']//a");
                 if (badgeTitle != null)
                     result.BadgeTitle = badgeTitle.InnerText.Trim();
             }

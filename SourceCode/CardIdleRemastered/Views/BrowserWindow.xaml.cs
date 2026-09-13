@@ -21,7 +21,7 @@ namespace CardIdleRemastered
         {
             await wbAuth.EnsureCoreWebView2Async(null);
 
-            wbAuth.Source = new Uri(@"https://steamcommunity.com/login/home/?goto=my/profile\");
+            wbAuth.Source = new Uri("https://steamcommunity.com/login/home/?goto=my/profile");
         }
 
         private void BrowserInitializationCompleted(object sender, Microsoft.Web.WebView2.Core.CoreWebView2InitializationCompletedEventArgs e)
@@ -57,6 +57,13 @@ namespace CardIdleRemastered
             }
         }
 
+        private static bool IsSteamProfileUrl(Uri url)
+        {
+            return url.Host.Equals("steamcommunity.com", StringComparison.OrdinalIgnoreCase)
+                && (url.AbsolutePath.StartsWith("/id/", StringComparison.OrdinalIgnoreCase)
+                    || url.AbsolutePath.StartsWith("/profiles/", StringComparison.OrdinalIgnoreCase));
+        }
+
         private async void BrowserNavigationCompleted(object sender, Microsoft.Web.WebView2.Core.CoreWebView2NavigationCompletedEventArgs e)
         {
             // Get the URL of the page that just finished loading
@@ -64,7 +71,7 @@ namespace CardIdleRemastered
 
             Logger.Info("Navigated to " + url);
 
-            if (!url.StartsWith(@"https://steamcommunity.com/id/"))
+            if (!Uri.TryCreate(url, UriKind.Absolute, out var profileUrl) || !IsSteamProfileUrl(profileUrl))
                 return;
 
             await GetProfileAuthCookies();
@@ -78,7 +85,7 @@ namespace CardIdleRemastered
                     Title = Properties.Resources.TradingCardsFAQ;
                     wbAuth.Source = new Uri("https://steamcommunity.com/tradingcards/faq");
                 }
-                else if (url.StartsWith(@"https://steamcommunity.com/id/"))
+                else if (IsSteamProfileUrl(profileUrl))
                 {
                     Close();
                 }
